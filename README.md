@@ -6,7 +6,7 @@ An **interactive ACP v2 bridge** for [DeepSeek Harness](https://github.com/deeps
 
 Maintained by [ALwith](https://github.com/ALwith-ai); **ALwith Desktop is its reference client** (the desktop form of dsh). Upstream's own ACP surface is deliberately automation-only (fresh sessions, committed output only); this bridge provides the interactive side.
 
-> Status: developer preview. Covers `session/new` + prompt + streaming + run-state reporting + cancel + `session/resume` (live-first reattach, cold resume from JSONL persistence, client-driven `replayFrom` history replay) + sandbox-first tools with escalation approvals + in-session model switching (`session/set_config_option`) + session titles + presets (`standard` / `minimal` / `anchored`).
+> Status: developer preview. Covers `session/new` + prompt + streaming + run-state reporting + cancel + `session/resume` (live-first reattach, cold resume from JSONL persistence, client-driven `replayFrom` history replay) + sandbox-first tools with escalation approvals + in-session model switching (`session/set_config_option`) + session titles + all dsh presets (`standard` / `minimal` / `anchored` / `code` PTC on the Bun-patched official worker runtime / `cordis` creator with the vm-realm dynamic-plugin toolset).
 
 ## Layout
 

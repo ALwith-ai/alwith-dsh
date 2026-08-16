@@ -6,7 +6,7 @@
 
 由 [ALwith](https://github.com/ALwith-ai) 维护;**ALwith Desktop 是它的参考客户端**(dsh 的桌面端形态)。上游的 ACP 实现是刻意的 automation-only(仅新会话、只发已提交输出),本桥补齐交互式一侧。
 
-> 状态:developer preview。覆盖 `session/new` + prompt + 流式 + 状态直报 + cancel + `session/resume`(live-first 接续、JSONL 持久化冷恢复、客户端 `replayFrom` 游标历史回放)+ 沙箱优先工具面与升级审批 + 会话中切模型(`session/set_config_option`)+ 会话标题 + 预设(`standard` / `minimal` / `anchored`)。
+> 状态:developer preview。覆盖 `session/new` + prompt + 流式 + 状态直报 + cancel + `session/resume`(live-first 接续、JSONL 持久化冷恢复、客户端 `replayFrom` 游标历史回放)+ 沙箱优先工具面与升级审批 + 会话中切模型(`session/set_config_option`)+ 会话标题 + 全部 dsh 预设(`standard` / `minimal` / `anchored` / `code` PTC,跑在 Bun 补丁版官方 worker 运行时上 / `cordis` 创造模式,vm 域动态插件工具组)。
 
 ## 结构
 

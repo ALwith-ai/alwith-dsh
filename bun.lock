@@ -13,6 +13,7 @@
         "@deepseek-ai/dsh-bash-sandbox": "0.1.0-rc.6",
         "@deepseek-ai/dsh-code-runtime": "0.1.0-rc.6",
         "@deepseek-ai/dsh-code-runtime-worker-thread": "0.1.0-rc.6",
+        "@deepseek-ai/dsh-cordis-host-runner": "0.1.0-rc.6",
         "@deepseek-ai/dsh-fs": "0.1.0-rc.6",
         "@deepseek-ai/dsh-fs-local": "0.1.0-rc.6",
         "@deepseek-ai/dsh-fs-observation-policy": "0.1.0-rc.6",
@@ -37,6 +38,7 @@
         "@deepseek-ai/dsh-terminal-bash": "0.1.0-rc.6",
         "@deepseek-ai/dsh-tool-bash": "0.1.0-rc.6",
         "@deepseek-ai/dsh-tool-bash-persistent": "0.1.0-rc.6",
+        "@deepseek-ai/dsh-tool-cordis": "0.1.0-rc.6",
         "@deepseek-ai/dsh-tool-fs": "0.1.0-rc.6",
         "@deepseek-ai/dsh-tool-fs-search": "0.1.0-rc.6",
         "@deepseek-ai/dsh-tool-str-replace-editor": "0.1.0-rc.6",
@@ -90,6 +92,8 @@
     "@deepseek-ai/dsh-commands": ["@deepseek-ai/dsh-commands@0.1.0-rc.6", "", { "dependencies": { "zod": "^4.4.3" }, "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1", "@deepseek-ai/dsh-agent": "^0.1.0-rc.6", "@deepseek-ai/dsh-brand": "^0.1.0-rc.6", "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6", "@deepseek-ai/dsh-scope": "^0.1.0-rc.6", "@deepseek-ai/dsh-session": "^0.1.0-rc.6", "@deepseek-ai/dsh-typert-protocol": "^0.1.0-rc.6" } }, "sha512-dq1GZmGTPXEGG01ksZ6Jj6DxAkzAbg+nepvfnM/P74d6EUcsFsEy7CfS18n0VJ6/2Wp0xOWsQyyuFElqbynO7w=="],
 
     "@deepseek-ai/dsh-compaction": ["@deepseek-ai/dsh-compaction@0.1.0-rc.6", "", { "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1", "@deepseek-ai/dsh-brand": "^0.1.0-rc.6", "@deepseek-ai/dsh-commands": "^0.1.0-rc.6", "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6", "@deepseek-ai/dsh-llm": "^0.1.0-rc.6", "@deepseek-ai/dsh-session": "^0.1.0-rc.6" } }, "sha512-Uu8qgrHom13gdwwxAnqmNuWM8MqafkRlhjQMMJYmaMVVxjEUewSJ6lwtMbUEBR5ViLsfv4pTm5TnhxNCjedBUw=="],
+
+    "@deepseek-ai/dsh-cordis-host-runner": ["@deepseek-ai/dsh-cordis-host-runner@0.1.0-rc.6", "", { "dependencies": { "@deepseek-ai/schemastery": "^3.18.1", "zod": "^4.4.3" }, "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1", "@deepseek-ai/dsh-agent": "^0.1.0-rc.6", "@deepseek-ai/dsh-brand": "^0.1.0-rc.6", "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6", "@deepseek-ai/dsh-llm": "^0.1.0-rc.6", "@deepseek-ai/dsh-scope": "^0.1.0-rc.6", "@deepseek-ai/dsh-session": "^0.1.0-rc.6", "@deepseek-ai/dsh-tools": "^0.1.0-rc.6", "@deepseek-ai/dsh-typert-protocol": "^0.1.0-rc.6" } }, "sha512-opN+kvxYf40rBVWhURZmq2E8uGWkv8r9L0YfynYAu/2YE7W/oGEQx2x1Mp0LxuWq1uec8rtu2GL2U17ORNuuVw=="],
 
     "@deepseek-ai/dsh-credentials": ["@deepseek-ai/dsh-credentials@0.1.0-rc.6", "", { "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1", "@deepseek-ai/dsh-brand": "^0.1.0-rc.6", "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6" } }, "sha512-zyYRs3A9gxfZjZfONzJdMhM0Gzbslpha+FGYkLDRAozgPj0N7mZdE+Qflx2V4WNrCnsSjuvOW0HFBxWtSRUTUw=="],
 
@@ -162,6 +166,8 @@
     "@deepseek-ai/dsh-tool-bash": ["@deepseek-ai/dsh-tool-bash@0.1.0-rc.6", "", { "dependencies": { "@deepseek-ai/schemastery": "^3.18.1" }, "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1", "@deepseek-ai/dsh-agent": "^0.1.0-rc.6", "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6", "@deepseek-ai/dsh-jobs": "^0.1.0-rc.6", "@deepseek-ai/dsh-llm": "^0.1.0-rc.6", "@deepseek-ai/dsh-sandbox": "^0.1.0-rc.6", "@deepseek-ai/dsh-sandbox-policy": "^0.1.0-rc.6", "@deepseek-ai/dsh-shell": "^0.1.0-rc.6", "@deepseek-ai/dsh-shell-env": "^0.1.0-rc.6", "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6", "@deepseek-ai/dsh-tools": "^0.1.0-rc.6", "@deepseek-ai/dsh-user-approval": "^0.1.0-rc.6" } }, "sha512-yzo/xPCObiFe+OU0e8E5nVOGpW6mp9vx/3q+MHQ0aqEbqrqHUfVMGPobfDAd/I1Ja/9Nag5NIvHpI2Hwx7lACg=="],
 
     "@deepseek-ai/dsh-tool-bash-persistent": ["@deepseek-ai/dsh-tool-bash-persistent@0.1.0-rc.6", "", { "dependencies": { "@deepseek-ai/schemastery": "^3.18.1" }, "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1", "@deepseek-ai/dsh-agent": "^0.1.0-rc.6", "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6", "@deepseek-ai/dsh-terminal": "^0.1.0-rc.6", "@deepseek-ai/dsh-timeout": "^0.1.0-rc.6", "@deepseek-ai/dsh-tools": "^0.1.0-rc.6" } }, "sha512-bsM1RHwkpNRAy0zufIDNUWxeiuGngc+R35RZ20gbWM878rHOZVuicy4MG8NKhzqGLqMD4NuDoNfjtDUkZHC48A=="],
+
+    "@deepseek-ai/dsh-tool-cordis": ["@deepseek-ai/dsh-tool-cordis@0.1.0-rc.6", "", { "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1", "@deepseek-ai/dsh-agent": "^0.1.0-rc.6", "@deepseek-ai/dsh-cordis-host-runner": "^0.1.0-rc.6", "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6", "@deepseek-ai/dsh-llm": "^0.1.0-rc.6", "@deepseek-ai/dsh-scope": "^0.1.0-rc.6", "@deepseek-ai/dsh-session": "^0.1.0-rc.6", "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6", "@deepseek-ai/dsh-tools": "^0.1.0-rc.6" } }, "sha512-MdsdiOzLaGps29FW2I6eO3vWUFttK80XGieD99rZM4p1pqwFQ8Ix22SIOhMeIqz70m1CvjoLxLak1vElte3lQw=="],
 
     "@deepseek-ai/dsh-tool-fs": ["@deepseek-ai/dsh-tool-fs@0.1.0-rc.6", "", { "dependencies": { "@deepseek-ai/schemastery": "^3.18.1", "diff": "^9.0.0" }, "peerDependencies": { "@deepseek-ai/cordis": "^4.0.1", "@deepseek-ai/dsh-attachment": "^0.1.0-rc.6", "@deepseek-ai/dsh-fs": "^0.1.0-rc.6", "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6", "@deepseek-ai/dsh-llm": "^0.1.0-rc.6", "@deepseek-ai/dsh-sandbox": "^0.1.0-rc.6", "@deepseek-ai/dsh-sandbox-policy": "^0.1.0-rc.6", "@deepseek-ai/dsh-session": "^0.1.0-rc.6", "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6", "@deepseek-ai/dsh-tools": "^0.1.0-rc.6", "@deepseek-ai/dsh-user-approval": "^0.1.0-rc.6" } }, "sha512-bJfo8cCacX3WBygG8GbIlGz3jQ15MyIv4htGCjKpIIRHrXHSAelNtzceO2xQ21/9BkXrvg+i50mqySOcKQ0b3w=="],
 

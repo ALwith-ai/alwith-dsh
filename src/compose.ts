@@ -42,6 +42,8 @@ import * as ToolWeb from "@deepseek-ai/dsh-tool-web"
 import * as WebSearchDeepseek from "@deepseek-ai/dsh-web-search-deepseek"
 import * as AnchoredToolBootstrap from "./vendor/anchored-tool-bootstrap.mjs"
 import CodeRuntimeWorker from "@deepseek-ai/dsh-code-runtime-worker-thread"
+import CordisHostRunner from "@deepseek-ai/dsh-cordis-host-runner"
+import * as ToolCordis from "@deepseek-ai/dsh-tool-cordis"
 import WebRuntime from "@deepseek-ai/dsh-web"
 import TerminalSessionService from "@deepseek-ai/dsh-terminal"
 import * as TerminalBash from "@deepseek-ai/dsh-terminal-bash"
@@ -53,7 +55,7 @@ import * as ToolStrReplaceEditor from "@deepseek-ai/dsh-tool-str-replace-editor"
  * built-in presets; `code` (Code Mode) and `cordis` (self-modification) are
  * not composed by this sidecar yet and are rejected at the entry.
  */
-export type HarnessPreset = "standard" | "minimal" | "anchored" | "code"
+export type HarnessPreset = "standard" | "minimal" | "anchored" | "code" | "cordis"
 
 export interface ComposeOptions {
   /**
@@ -166,6 +168,14 @@ export async function composeRuntime(options: ComposeOptions = {}): Promise<Cont
     await ctx.plugin(ToolWeb, { fetch: false, searchTimeoutMs: 60000 })
     if (preset === "code") {
       await ctx.plugin(CodeRuntimeWorker)
+    }
+    if (preset === "cordis") {
+      // dsh's creator preset: the standard surface plus the self-referential
+      // Cordis toolset (define / run / inspect model-written plugins in a
+      // node:vm realm). Trust boundary, not a sandbox — mirrors the preset's
+      // own header. The composition-authoring skill is not bundled yet.
+      await ctx.plugin(CordisHostRunner)
+      await ctx.plugin(ToolCordis)
     }
   }
   return ctx

@@ -15,10 +15,12 @@ import JsonlSessionPersistence from "@deepseek-ai/dsh-session-persistence-jsonl"
 import { mountAgentLoopTestDependencies } from "@deepseek-ai/dsh-agent-loop-testkit"
 import * as Bridge from "../src/bridge.ts"
 
+export type ScriptEntry = StreamChunk[] | ((options: GenerateOptions) => StreamChunk[])
+
 export class MockAdapter extends LlmAdapter {
   readonly requests: GenerateOptions[] = []
 
-  constructor(private readonly script: StreamChunk[][]) {
+  constructor(private readonly script: ScriptEntry[]) {
     super()
   }
 
@@ -37,7 +39,8 @@ export class MockAdapter extends LlmAdapter {
     this.requests.push(options)
     const entry = this.script.shift()
     if (entry === undefined) throw new Error("MockAdapter: script exhausted")
-    for (const chunk of entry) {
+    const chunks = typeof entry === "function" ? entry(options) : entry
+    for (const chunk of chunks) {
       if (options.signal?.aborted) throw new Error("aborted")
       yield chunk
     }
@@ -70,7 +73,7 @@ export interface HarnessOptions {
   sessionsRoot?: string
 }
 
-export async function makeHarness(script: StreamChunk[][], options: HarnessOptions = {}) {
+export async function makeHarness(script: ScriptEntry[], options: HarnessOptions = {}) {
   const adapter = new MockAdapter(script)
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx, { systemPrompt: { persona: "" } })
