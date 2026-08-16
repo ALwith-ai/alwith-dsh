@@ -71,6 +71,8 @@ export const ACP_PROTOCOL_VERSION = 2
 export interface AcpConfig {
   provider?: string
   model?: string
+  /** Host-facing provider identity stamped into `_meta.alwith` turn metadata; defaults to `provider`. */
+  providerId?: string
   /** Test-only transport override; production uses stdio. */
   stream?: Stream
 }
@@ -78,6 +80,7 @@ export interface AcpConfig {
 export const Config: Schema<AcpConfig> = Schema.object({
   provider: Schema.string(),
   model: Schema.string(),
+  providerId: Schema.string(),
 })
 
 /** Per-session protocol state. */
@@ -239,6 +242,19 @@ export function apply(ctx: Context, config: AcpConfig): void {
     })
   }
 
+  /**
+   * `_meta.alwith` turn metadata the ALwith Desktop client reads off assistant
+   * and tool frames (turn_provider / turn_model / turn_timestamp); a turn
+   * without an assistant providerId fails the client's envelope refresh.
+   */
+  const turnMeta = (record: SessionRecord): { alwith: { providerId: string; model: string; timestamp: string } } => ({
+    alwith: {
+      providerId: config.providerId ?? config.provider ?? "dsh",
+      model: record.model,
+      timestamp: new Date().toISOString(),
+    },
+  })
+
   /** Build the downlinked model config option from the adapter catalog; empty catalog downlinks nothing. */
   const modelConfigOptions = async (record: SessionRecord): Promise<SessionConfigOption[]> => {
     const llm = ctx.get("llm")
@@ -337,7 +353,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
           if (block.type === "text" && block.text.length > 0) {
             notify({
               sessionId,
-              update: { sessionUpdate: "agent_message_chunk", messageId: MessageId(message.id), content: { type: "text", text: block.text } },
+              update: { sessionUpdate: "agent_message_chunk", messageId: MessageId(message.id), content: { type: "text", text: block.text }, _meta: turnMeta(record) },
             })
           } else if (block.type === "reasoning" && block.text.length > 0) {
             notify({
@@ -381,7 +397,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
         if (chunk.type === "text-delta" && chunk.text.length > 0) {
           notify({
             sessionId: record.agent.session.id,
-            update: { sessionUpdate: "agent_message_chunk", messageId, content: { type: "text", text: chunk.text } },
+            update: { sessionUpdate: "agent_message_chunk", messageId, content: { type: "text", text: chunk.text }, _meta: turnMeta(record) },
           })
         } else if (chunk.type === "reasoning-delta" && chunk.text.length > 0) {
           notify({
@@ -390,6 +406,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
               sessionUpdate: "agent_thought_chunk",
               messageId: MessageId(`${messageId}/thought`),
               content: { type: "text", text: chunk.text },
+              _meta: turnMeta(record),
             },
           })
         }
@@ -402,6 +419,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
                 sessionUpdate: "agent_message_chunk",
                 messageId: MessageId(event.data.message.id),
                 content: { type: "text", text: `[image attachment ${block.attachment.attachmentId}]` },
+                _meta: turnMeta(record),
               },
             })
           }
@@ -420,6 +438,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
             title: event.data.name,
             status: "in_progress",
             rawInput: parseRawInput(event.data.arguments),
+            _meta: turnMeta(record),
           },
         })
       } else if (event.type === "tool/result") {
@@ -431,6 +450,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
             toolCallId: ToolCallId(result.toolCallId),
             status: event.data.error !== undefined || result.isError === true ? "failed" : "completed",
             content: toolResultContent(result.content),
+            _meta: turnMeta(record),
           },
         })
       } else if (event.type === "todo/write") {

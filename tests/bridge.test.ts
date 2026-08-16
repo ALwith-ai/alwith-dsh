@@ -30,6 +30,12 @@ describe("alwith-dsh-acp bridge", () => {
     expect(chunks.length).toBeGreaterThan(1)
     const text = chunks.map(update => (update as { content: { text: string } }).content.text).join("")
     expect(text).toBe("hello")
+    // Every assistant frame carries _meta.alwith turn metadata (the ALwith
+    // Desktop client refuses a turn without an assistant providerId).
+    const meta = (chunks.at(0) as { _meta?: { alwith?: { providerId?: string; model?: string; timestamp?: string } } })._meta
+    expect(meta?.alwith?.providerId).toBe("mock")
+    expect(meta?.alwith?.model).toBe("mock")
+    expect(typeof meta?.alwith?.timestamp).toBe("string")
     await h.dispose()
   })
 

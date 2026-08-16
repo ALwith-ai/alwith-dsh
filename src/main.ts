@@ -11,6 +11,9 @@ import * as Bridge from "./bridge.ts"
 
 const provider = process.env.ALWITH_DSH_PROVIDER ?? "deepseek-official"
 const model = process.env.ALWITH_DSH_MODEL ?? "deepseek-v4-flash"
+// Host-facing provider identity for _meta.alwith turn metadata (the ALwith
+// Desktop provider vocabulary, not the dsh adapter route).
+const providerId = process.env.ALWITH_DSH_PROVIDER_ID ?? "deepseek"
 // Session logs live under the sidecar's own home by default; the host
 // (ALwith Desktop) overrides this to its managed location.
 const sessionsRoot = process.env.ALWITH_DSH_SESSIONS_ROOT ?? join(homedir(), ".alwith-dsh", "sessions")
@@ -30,6 +33,6 @@ if (rawPreset !== "standard" && rawPreset !== "minimal" && rawPreset !== "anchor
 
 const ctx = await composeRuntime({ sessionsRoot, workspaceRoot, permissionMode, preset: rawPreset })
 await ctx.plugin(
-  { name: Bridge.name, inject: [...Bridge.inject], apply: (inner: typeof ctx) => Bridge.apply(inner, { provider, model }) },
+  { name: Bridge.name, inject: [...Bridge.inject], apply: (inner: typeof ctx) => Bridge.apply(inner, { provider, model, providerId }) },
 )
 // stdin keeps the process alive; the bridge's quiesce handles connection close.
