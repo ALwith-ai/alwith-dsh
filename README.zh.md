@@ -14,7 +14,9 @@
 |---|---|
 | `src/bridge.ts` | ACP v2 服务器插件(改编自上游 automation-only v1 桥,MIT) |
 | `src/codec.ts` | 线格式纯转换(改编自上游 codec) |
-| `src/compose.ts` | 手工组合的插件集(不用 dsh loader/profile——组合确定性,Bun 可跑) |
+| `src/plugins.ts` | 插件清单:组合面即数据(逐预设 roster、核心行保护、用户覆盖) |
+| `src/compose.ts` | 按清单组合运行时(不用 dsh loader/profile——组合确定性,Bun 可跑) |
+| `src/plugins-cli.ts` | `plugins` 子命令:无活会话即可列出与开关插件 |
 | `src/main.ts` | stdio 入口,供宿主 spawn |
 
 ## 运行
@@ -25,6 +27,21 @@ bun test                              # mock 适配器协议测试,不打真模�
 ```
 
 `session/resume` 语义:`replayFrom` 省略 = 只恢复上下文;`{ type: "start" }` = 整段对话重放为 `session/update` 帧。会话日志在 `$ALWITH_DSH_SESSIONS_ROOT`(默认 `~/.alwith-dsh/sessions`)。
+
+## 插件
+
+各预设的组合面在代码里写死(确定性),但用户保有 dsh 的两个自由度——逐插件开关与逐插件配置——经覆盖文件(`$ALWITH_DSH_PLUGINS_FILE`,默认 `~/.alwith-dsh/plugins.json`)生效;spawn 时读取,改动作用于新会话:
+
+```sh
+bun src/main.ts plugins list --preset standard   # 该预设的全部行,JSON
+bun src/main.ts plugins set tool-web disabled    # 先校验再落盘
+```
+
+```json
+{ "disabled": ["tool-web"], "config": { "bash-sandbox": { "timeoutMs": 120000 } } }
+```
+
+核心行(session、llm、沙箱、审批…)不可停用;停用某行会让另一启用行的 `requires` 落空时,拒绝并给出确切改法——两者都在写盘前炸清楚。`config` 条目与该行默认配置浅合并。
 
 ## License
 

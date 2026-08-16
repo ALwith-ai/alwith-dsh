@@ -14,7 +14,9 @@ Maintained by [ALwith](https://github.com/ALwith-ai); **ALwith Desktop is its re
 |---|---|
 | `src/bridge.ts` | ACP v2 server plugin (adapted from upstream's automation-only v1 bridge, MIT) |
 | `src/codec.ts` | Pure wire-format translation (adapted from the upstream codec) |
-| `src/compose.ts` | Hand-composed plugin set (no dsh loader/profile — deterministic composition, runs on Bun) |
+| `src/plugins.ts` | Plugin manifest: the composition as data (per-preset roster, core protection, overrides) |
+| `src/compose.ts` | Composes the runtime from the manifest (no dsh loader/profile — deterministic, runs on Bun) |
+| `src/plugins-cli.ts` | `plugins` subcommand: list and toggle plugins without a live session |
 | `src/main.ts` | stdio entry for hosts to spawn |
 
 ## Run
@@ -25,6 +27,21 @@ bun test                              # protocol tests with a mock adapter; no r
 ```
 
 `session/resume` semantics: an omitted `replayFrom` means context-only restore; `{ type: "start" }` replays the whole conversation as `session/update` frames. Session logs live under `$ALWITH_DSH_SESSIONS_ROOT` (default `~/.alwith-dsh/sessions`).
+
+## Plugins
+
+The composition per preset is fixed here in code (deterministic), but users keep dsh's two degrees of freedom — per-plugin enable/disable and per-plugin config — through an overrides file (`$ALWITH_DSH_PLUGINS_FILE`, default `~/.alwith-dsh/plugins.json`), read at spawn so changes apply to new sessions:
+
+```sh
+bun src/main.ts plugins list --preset standard   # every row of the preset, JSON
+bun src/main.ts plugins set tool-web disabled    # validated before writing
+```
+
+```json
+{ "disabled": ["tool-web"], "config": { "bash-sandbox": { "timeoutMs": 120000 } } }
+```
+
+Core rows (session, llm, sandbox, approvals, …) cannot be disabled, and disabling a row another enabled row `requires` is rejected with the exact fix — both fail loud before anything is written. `config` entries shallow-merge over the row defaults.
 
 ## License
 

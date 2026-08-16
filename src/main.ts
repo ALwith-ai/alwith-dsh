@@ -7,7 +7,22 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { composeRuntime } from "./compose.ts"
+import { loadPluginOverrides } from "./plugins.ts"
+import { defaultPluginsFile, runPluginsCli } from "./plugins-cli.ts"
 import * as Bridge from "./bridge.ts"
+
+// `plugins` subcommand: overrides-file management for hosts, no ACP server.
+// Validation failures exit 1 with the reason as a single stderr line — the
+// host surfaces stderr verbatim, so no runtime stack noise here.
+if (process.argv[2] === "plugins") {
+  try {
+    await runPluginsCli(process.argv.slice(3))
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+    process.exit(1)
+  }
+  process.exit(0)
+}
 
 const provider = process.env.ALWITH_DSH_PROVIDER ?? "deepseek-official"
 const model = process.env.ALWITH_DSH_MODEL ?? "deepseek-v4-flash"
@@ -32,7 +47,10 @@ if (!(PRESETS as readonly string[]).includes(rawPreset)) {
   throw new Error(`unsupported harness preset "${rawPreset}": this sidecar composes ${PRESETS.join(", ")}`)
 }
 
-const ctx = await composeRuntime({ sessionsRoot, workspaceRoot, permissionMode, preset: rawPreset as (typeof PRESETS)[number] })
+// Per-plugin enable/disable + config; invalid content fails the spawn loud.
+const overrides = loadPluginOverrides(defaultPluginsFile())
+
+const ctx = await composeRuntime({ sessionsRoot, workspaceRoot, permissionMode, preset: rawPreset as (typeof PRESETS)[number], overrides })
 await ctx.plugin(
   { name: Bridge.name, inject: [...Bridge.inject], apply: (inner: typeof ctx) => Bridge.apply(inner, { provider, model, providerId }) },
 )
