@@ -21,8 +21,14 @@ const permissionMode = (process.env.ALWITH_DSH_PERMISSION_MODE ?? "workspace-wri
   | "read-only"
   | "workspace-write"
   | "danger-full-access"
+// Preset gate fails loud on the modes this sidecar does not compose yet —
+// the host UI disables them, and a misrouted value must not silently degrade.
+const rawPreset = process.env.ALWITH_DSH_PRESET ?? "standard"
+if (rawPreset !== "standard" && rawPreset !== "minimal") {
+  throw new Error(`unsupported harness preset "${rawPreset}": this sidecar composes standard and minimal only`)
+}
 
-const ctx = await composeRuntime({ sessionsRoot, workspaceRoot, permissionMode })
+const ctx = await composeRuntime({ sessionsRoot, workspaceRoot, permissionMode, preset: rawPreset })
 await ctx.plugin(
   { name: Bridge.name, inject: [...Bridge.inject], apply: (inner: typeof ctx) => Bridge.apply(inner, { provider, model }) },
 )

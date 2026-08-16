@@ -37,6 +37,17 @@ import * as FsObservationPolicy from "@deepseek-ai/dsh-fs-observation-policy"
 import * as ToolFs from "@deepseek-ai/dsh-tool-fs"
 import * as ToolBash from "@deepseek-ai/dsh-tool-bash"
 import * as ToolTodo from "@deepseek-ai/dsh-tool-todo"
+import TerminalSessionService from "@deepseek-ai/dsh-terminal"
+import * as TerminalBash from "@deepseek-ai/dsh-terminal-bash"
+import * as ToolBashPersistent from "@deepseek-ai/dsh-tool-bash-persistent"
+import * as ToolStrReplaceEditor from "@deepseek-ai/dsh-tool-str-replace-editor"
+
+/**
+ * Agent preset: which tool surface the composed agent gets. Mirrors dsh's
+ * built-in presets; `code` (Code Mode) and `cordis` (self-modification) are
+ * not composed by this sidecar yet and are rejected at the entry.
+ */
+export type HarnessPreset = "standard" | "minimal"
 
 export interface ComposeOptions {
   /**
@@ -48,6 +59,8 @@ export interface ComposeOptions {
   workspaceRoot?: string
   /** Deployment permission mode; mirrors dsh's DSH_PERMISSION_MODE. */
   permissionMode?: "read-only" | "workspace-write" | "danger-full-access"
+  /** Tool-surface preset; defaults to the standard coding agent. */
+  preset?: HarnessPreset
 }
 
 export async function composeRuntime(options: ComposeOptions = {}): Promise<Context> {
@@ -85,9 +98,17 @@ export async function composeRuntime(options: ComposeOptions = {}): Promise<Cont
       "danger-full-access": { sandbox: "danger-full-access", approval: "never" },
     },
   })
-  // Model-facing tools (configs mirror dsh's shipped base bundle).
-  await ctx.plugin(ToolFs)
-  await ctx.plugin(ToolBash)
-  await ctx.plugin(ToolTodo, { allowParallelInProgress: true })
+  // Model-facing tools per preset (configs mirror dsh's shipped rows).
+  if ((options.preset ?? "standard") === "minimal") {
+    // dsh's minimal preset: a two-tool coding agent — persistent bash + str_replace_editor.
+    await ctx.plugin(TerminalSessionService)
+    await ctx.plugin(TerminalBash)
+    await ctx.plugin(ToolBashPersistent)
+    await ctx.plugin(ToolStrReplaceEditor, { maxOutputChars: 16000 })
+  } else {
+    await ctx.plugin(ToolFs)
+    await ctx.plugin(ToolBash)
+    await ctx.plugin(ToolTodo, { allowParallelInProgress: true })
+  }
   return ctx
 }
