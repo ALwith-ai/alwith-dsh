@@ -41,6 +41,8 @@ import {
   type PromptResponse,
   type ResumeSessionRequest,
   type ResumeSessionResponse,
+  type SessionConfigOption,
+  type SetSessionConfigOptionResponse,
   type MessageId,
   type PlanId,
   type ToolCallContent,
@@ -94,6 +96,12 @@ interface SessionRecord {
   pendingPermissions: number
   /** Last emitted state_update value, deduplicating consecutive identical frames. */
   lastState: "running" | "idle" | "requires_action" | undefined
+  /** Whether a session_info_update title was already emitted (first prompt names the session). */
+  titled: boolean
+  /** The model this session currently runs on (config default, then set_config_option switches). */
+  model: string
+  /** In-flight model switch; prompts await it so they never drive a retiring agent. */
+  switching: Promise<void> | undefined
 }
 
 /** Brand a string as a v2 MessageId (the schema type is a branded string). */
@@ -231,6 +239,24 @@ export function apply(ctx: Context, config: AcpConfig): void {
     })
   }
 
+  /** Build the downlinked model config option from the adapter catalog; empty catalog downlinks nothing. */
+  const modelConfigOptions = async (record: SessionRecord): Promise<SessionConfigOption[]> => {
+    const llm = ctx.get("llm")
+    if (llm === undefined || config.provider === undefined) return []
+    const models = await llm.listModels(config.provider)
+    if (models.length === 0) return []
+    return [
+      {
+        id: "model",
+        name: "Model",
+        category: "model",
+        type: "select",
+        currentValue: record.model,
+        options: models.map(model => ({ value: model.id, name: model.name })),
+      } as unknown as SessionConfigOption,
+    ]
+  }
+
   const settlePrompt = (record: SessionRecord): void => {
     const inflight = record.inflight
     if (inflight === undefined) return
@@ -278,6 +304,9 @@ export function apply(ctx: Context, config: AcpConfig): void {
       inflight: undefined,
       pendingPermissions: 0,
       lastState: undefined,
+      titled: true, // a resumed session already carries its name on the client
+      model: config.model ?? "",
+      switching: undefined,
     }
     sessions.set(sessionId, record)
     return record
@@ -510,8 +539,13 @@ export function apply(ctx: Context, config: AcpConfig): void {
         inflight: undefined,
         pendingPermissions: 0,
         lastState: undefined,
+        titled: false,
+        model: config.model ?? "",
+        switching: undefined,
       })
-      return { sessionId }
+      const record = sessions.get(sessionId)
+      if (record === undefined) throw internalError("session record vanished during session/new")
+      return { sessionId, configOptions: await modelConfigOptions(record) }
     })
     .onRequest("session/resume", async (context): Promise<ResumeSessionResponse> => {
       assertOpen()
@@ -524,7 +558,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
         resumes.set(sessionId, pending)
         void pending.catch(() => {}).finally(() => resumes.delete(sessionId))
       }
-      const record = await pending
+      const acquired = await pending
       // Replay is client-driven: an omitted/null cursor means context-only
       // restore (the client already has the history); { type: "start" } means
       // replay the whole conversation.
@@ -532,14 +566,65 @@ export function apply(ctx: Context, config: AcpConfig): void {
         if (params.replayFrom.type !== "start") {
           throw invalidParams(`unsupported replayFrom cursor: ${params.replayFrom.type}`)
         }
-        replayHistory(record)
+        replayHistory(acquired)
       }
-      return {}
+      return { configOptions: await modelConfigOptions(acquired) }
     })
+    .onRequest(
+      "session/set_config_option",
+      // Custom parser: ALwith Desktop sends { sessionId, configId, value } without
+      // the schema's `type` discriminant (the alwith-cli dialect); accept both.
+      (params: unknown) => {
+        const body = params as { sessionId?: string; configId?: string; value?: unknown }
+        if (typeof body?.sessionId !== "string" || typeof body.configId !== "string") {
+          throw invalidParams("session/set_config_option requires sessionId and configId")
+        }
+        return { sessionId: body.sessionId, configId: body.configId, value: body.value }
+      },
+      async (context): Promise<SetSessionConfigOptionResponse> => {
+        assertOpen()
+        const { sessionId, configId, value } = context.params
+        const record = requireSession(sessionId)
+        if (configId !== "model") throw invalidParams(`unsupported config option: ${configId}`)
+        if (typeof value !== "string" || value.length === 0) throw invalidParams("model value must be a non-empty string")
+        if (record.inflight !== undefined) throw invalidParams("cannot switch model while a prompt is in flight")
+        if (record.switching !== undefined) await record.switching
+        if (record.model !== value) {
+          // In-place options are immutable on a live dsh agent; the sanctioned
+          // switch is dispose + resume with new agentOptions — same machinery
+          // as session/resume, so history and turn numbering carry over.
+          const persistence = ctx.get("sessionPersistence")
+          if (persistence === undefined) {
+            throw internalError("session persistence is not configured; model switching is unavailable")
+          }
+          const previous = record.agent
+          const id = previous.session.id
+          record.switching = (async () => {
+            await record.dispose()
+            const handle = await agents.resume({
+              resumeSessionId: id,
+              agentOptions: { ...(config.provider !== undefined ? { provider: config.provider } : {}), model: value },
+            })
+            record.agent = handle.agent
+            record.dispose = () => handle.dispose()
+            record.model = value
+          })()
+          try {
+            await record.switching
+          } finally {
+            record.switching = undefined
+          }
+        }
+        const configOptions = await modelConfigOptions(record)
+        notify({ sessionId: record.agent.session.id, update: { sessionUpdate: "config_option_update", configOptions } })
+        return { configOptions }
+      },
+    )
     .onRequest("session/prompt", async (context): Promise<PromptResponse> => {
       assertOpen()
       const params: PromptRequest = context.params
       const record = requireSession(params.sessionId)
+      if (record.switching !== undefined) await record.switching
       if (promptHasUnsupportedContent(params.prompt)) {
         throw invalidParams("only text and resource_link prompt content is supported")
       }
@@ -553,6 +638,16 @@ export function apply(ctx: Context, config: AcpConfig): void {
       // Bridge contract: never drive a retired agent — a loop-only reload disposes agents while bridge records survive.
       if (ctx.agents.get(record.agent.id) !== record.agent) {
         throw internalError("prompt was not queued: the agent was disposed outside the bridge")
+      }
+      if (!record.titled) {
+        // Deterministic session title from the first prompt (LLM titling is a
+        // later enhancement); the host also backfills run-state titles from this frame.
+        record.titled = true
+        const title = text.trim().replace(/\s+/g, " ").slice(0, 60)
+        notify({
+          sessionId: record.agent.session.id,
+          update: { sessionUpdate: "session_info_update", title },
+        })
       }
       const message = createUserMessage({ content: [{ type: "text", text }], source: { kind: "user" } })
       if (record.inflight !== undefined) {

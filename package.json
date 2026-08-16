@@ -40,10 +40,14 @@
     "@deepseek-ai/dsh-tool-bash": "0.1.0-rc.6",
     "@deepseek-ai/dsh-tool-bash-persistent": "0.1.0-rc.6",
     "@deepseek-ai/dsh-tool-fs": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-tool-fs-search": "0.1.0-rc.6",
     "@deepseek-ai/dsh-tool-str-replace-editor": "0.1.0-rc.6",
     "@deepseek-ai/dsh-tool-todo": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-tool-web": "0.1.0-rc.6",
     "@deepseek-ai/dsh-tools": "0.1.0-rc.6",
     "@deepseek-ai/dsh-user-approval": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-web": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-web-search-deepseek": "0.1.0-rc.6",
     "@deepseek-ai/schemastery": "3.18.1"
   },
   "devDependencies": {

@@ -15,7 +15,7 @@ async function toolNames(preset: "standard" | "minimal"): Promise<string[]> {
 
 describe("harness presets", () => {
   test("standard composes the coding-agent tool surface", async () => {
-    expect(await toolNames("standard")).toEqual(["bash", "edit", "read", "todo_write", "write"])
+    expect(await toolNames("standard")).toEqual(["bash", "edit", "glob", "grep", "read", "todo_write", "web_search", "write"])
   })
 
   test("minimal composes exactly the two-tool agent (persistent bash + str_replace_editor)", async () => {

@@ -16,3 +16,11 @@ Copyright (c) 2026 DeepSeek
 Runtime dependencies `@deepseek-ai/dsh-*` (MIT) and `@agentclientprotocol/sdk`
 (Apache-2.0) are consumed as npm packages; see their distributions for the
 respective licenses.
+
+---
+
+`src/vendor/anchored-tool-bootstrap.mjs` is vendored from
+[dsh-web-ui](https://github.com/zhu1090093659/dsh-web-ui) (Apache-2.0), package
+`dsh-liangshen`, itself derived from
+[xiaobright/dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)
+(MIT). The file retains its upstream licenses; see the provenance header inside it.

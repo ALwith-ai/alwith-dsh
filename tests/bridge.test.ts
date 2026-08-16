@@ -46,6 +46,20 @@ describe("alwith-dsh-acp bridge", () => {
     await h.dispose()
   })
 
+  test("first prompt emits a session_info_update title exactly once", async () => {
+    const h = await makeHarness([textResponse("a"), textResponse("b")])
+    await h.initialize()
+    const { sessionId } = await h.agent.request("session/new", { cwd: "/tmp" })
+    await h.agent.request("session/prompt", { sessionId, prompt: [{ type: "text", text: "  name   this session  " }] })
+    await untilFrame(() => h.states().filter(entry => entry.state === "idle").length >= 1)
+    await h.agent.request("session/prompt", { sessionId, prompt: [{ type: "text", text: "second" }] })
+    await untilFrame(() => h.states().filter(entry => entry.state === "idle").length >= 2)
+    const titles = h.updates.filter(update => update.sessionUpdate === "session_info_update") as Array<{ title?: string }>
+    expect(titles.length).toBe(1)
+    expect(titles[0]?.title).toBe("name this session")
+    await h.dispose()
+  })
+
   test("empty prompt is not an error: announced by an idle(end_turn) frame, then resolves", async () => {
     const h = await makeHarness([])
     await h.initialize()

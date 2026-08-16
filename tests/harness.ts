@@ -26,6 +26,13 @@ export class MockAdapter extends LlmAdapter {
     return Promise.resolve({ provider, id: model, name: model })
   }
 
+  override listModels(provider: string) {
+    return Promise.resolve([
+      { provider, id: "mock", name: "Mock" },
+      { provider, id: "mock-pro", name: "Mock Pro" },
+    ])
+  }
+
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     this.requests.push(options)
     const entry = this.script.shift()
