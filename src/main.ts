@@ -14,8 +14,15 @@ const model = process.env.ALWITH_DSH_MODEL ?? "deepseek-v4-flash"
 // Session logs live under the sidecar's own home by default; the host
 // (ALwith Desktop) overrides this to its managed location.
 const sessionsRoot = process.env.ALWITH_DSH_SESSIONS_ROOT ?? join(homedir(), ".alwith-dsh", "sessions")
+// The host spawns one sidecar per session and pins the sandbox workspace to
+// that session's cwd; standalone runs default to the process cwd.
+const workspaceRoot = process.env.ALWITH_DSH_WORKSPACE_ROOT ?? process.cwd()
+const permissionMode = (process.env.ALWITH_DSH_PERMISSION_MODE ?? "workspace-write") as
+  | "read-only"
+  | "workspace-write"
+  | "danger-full-access"
 
-const ctx = await composeRuntime({ sessionsRoot })
+const ctx = await composeRuntime({ sessionsRoot, workspaceRoot, permissionMode })
 await ctx.plugin(
   { name: Bridge.name, inject: [...Bridge.inject], apply: (inner: typeof ctx) => Bridge.apply(inner, { provider, model }) },
 )

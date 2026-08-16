@@ -42,6 +42,9 @@ import {
   type ResumeSessionRequest,
   type ResumeSessionResponse,
   type MessageId,
+  type PlanId,
+  type ToolCallContent,
+  type ToolCallId,
   type UpdateSessionNotification,
   type StopReason,
   type Stream,
@@ -52,6 +55,7 @@ import { SessionId, type SessionEvent, type TurnEndReason } from "@deepseek-ai/d
 // types and the ctx.sessionPersistence key.
 import type {} from "@deepseek-ai/dsh-user-approval"
 import type {} from "@deepseek-ai/dsh-session-persistence"
+import type { ContentBlock as DshContentBlock } from "@deepseek-ai/dsh-llm"
 import { acpPromptToText, promptHasUnsupportedContent, turnEndToStopReason } from "./codec.ts"
 
 export const name = "alwith-dsh-acp"
@@ -95,6 +99,25 @@ interface SessionRecord {
 /** Brand a string as a v2 MessageId (the schema type is a branded string). */
 function MessageId(id: string): MessageId {
   return id as MessageId
+}
+
+/** Brand a string as a v2 ToolCallId. */
+function ToolCallId(id: string): ToolCallId {
+  return id as ToolCallId
+}
+
+/** Brand a string as a v2 PlanId. */
+function PlanId(id: string): PlanId {
+  return id as PlanId
+}
+
+/** Parse tool-call arguments for rawInput; malformed JSON stays a string rather than crashing the stream. */
+function parseRawInput(argumentsJson: string): unknown {
+  try {
+    return JSON.parse(argumentsJson)
+  } catch {
+    return argumentsJson
+  }
 }
 
 function invalidParams(detail: string): RequestError {
@@ -158,6 +181,53 @@ export function apply(ctx: Context, config: AcpConfig): void {
     notify({
       sessionId: record.agent.session.id,
       update: { sessionUpdate: "state_update", state: "idle", stopReason },
+    })
+  }
+
+  /** Map a tool result's model-facing blocks to v2 tool-call content (text verbatim, images as placeholders). */
+  const toolResultContent = (blocks: readonly DshContentBlock[]): ToolCallContent[] => {
+    const content: ToolCallContent[] = []
+    for (const block of blocks) {
+      if (block.type === "text" && block.text.length > 0) {
+        content.push({ type: "content", content: { type: "text", text: block.text } })
+      } else if (block.type === "image") {
+        content.push({ type: "content", content: { type: "text", text: `[image attachment ${block.attachment.attachmentId}]` } })
+      }
+    }
+    return content
+  }
+
+  // usage_update needs the context-window size; resolve it once per bridge
+  // lifetime (provider/model are fixed per composition) and skip the frame
+  // when the model does not declare a window.
+  let contextWindow: Promise<number | undefined> | undefined
+  const resolveContextWindow = (): Promise<number | undefined> => {
+    contextWindow ??= (async () => {
+      const llm = ctx.get("llm")
+      if (llm === undefined || config.provider === undefined || config.model === undefined) return undefined
+      try {
+        const info = await llm.resolveModelInfo(config.provider, config.model)
+        return info.context?.contextWindow
+      } catch (error: unknown) {
+        logger.warn(`acp: resolveModel failed, usage_update disabled: ${String(error)}`)
+        return undefined
+      }
+    })()
+    return contextWindow
+  }
+
+  const emitUsage = (record: SessionRecord, usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number } | undefined): void => {
+    if (usage === undefined) return
+    void resolveContextWindow().then(size => {
+      if (size === undefined) return
+      notify({
+        sessionId: record.agent.session.id,
+        update: {
+          sessionUpdate: "usage_update",
+          used: usage.inputTokens + (usage.cacheReadTokens ?? 0) + usage.outputTokens,
+          size,
+        },
+      })
     })
   }
 
@@ -307,6 +377,47 @@ export function apply(ctx: Context, config: AcpConfig): void {
             })
           }
         }
+        emitUsage(record, event.data.usage)
+      } else if (event.type === "tool/call") {
+        // First frame with a standard name creates the client-side card
+        // (v2 dropped the tool_call variant; creation and patch share
+        // tool_call_update).
+        notify({
+          sessionId: record.agent.session.id,
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: ToolCallId(event.data.callId),
+            name: event.data.name,
+            title: event.data.name,
+            status: "in_progress",
+            rawInput: parseRawInput(event.data.arguments),
+          },
+        })
+      } else if (event.type === "tool/result") {
+        const result = event.data.message.content[0]
+        notify({
+          sessionId: record.agent.session.id,
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: ToolCallId(result.toolCallId),
+            status: event.data.error !== undefined || result.isError === true ? "failed" : "completed",
+            content: toolResultContent(result.content),
+          },
+        })
+      } else if (event.type === "todo/write") {
+        // Whole-list snapshot; v2 item-based plans are replaced per update, so
+        // the shapes align one to one.
+        notify({
+          sessionId: record.agent.session.id,
+          update: {
+            sessionUpdate: "plan_update",
+            plan: {
+              type: "items",
+              planId: PlanId(record.agent.session.id),
+              entries: event.data.todos.map(todo => ({ content: todo.content, status: todo.status, priority: "medium" as const })),
+            },
+          },
+        })
       }
     } finally {
       const inflight = record.inflight
