@@ -17,6 +17,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
+import { fileURLToPath } from "node:url"
 import { Context } from "@deepseek-ai/cordis"
 import LlmRuntime from "@deepseek-ai/dsh-llm"
 import SessionStore from "@deepseek-ai/dsh-session"
@@ -49,6 +50,9 @@ import * as AnchoredToolBootstrap from "./vendor/anchored-tool-bootstrap.mjs"
 import CodeRuntimeWorker from "@deepseek-ai/dsh-code-runtime-worker-thread"
 import CordisHostRunner from "@deepseek-ai/dsh-cordis-host-runner"
 import * as ToolCordis from "@deepseek-ai/dsh-tool-cordis"
+import SkillRegistry from "@deepseek-ai/dsh-skill"
+import * as SkillFilesystem from "@deepseek-ai/dsh-skill-filesystem"
+import * as ToolSkill from "@deepseek-ai/dsh-tool-skill"
 import WebRuntime from "@deepseek-ai/dsh-web"
 import TerminalSessionService from "@deepseek-ai/dsh-terminal"
 import * as TerminalBash from "@deepseek-ai/dsh-terminal-bash"
@@ -56,6 +60,22 @@ import * as ToolBashPersistent from "@deepseek-ai/dsh-tool-bash-persistent"
 import * as ToolStrReplaceEditor from "@deepseek-ai/dsh-tool-str-replace-editor"
 
 export type HarnessPreset = "standard" | "minimal" | "anchored" | "code" | "cordis"
+
+/** Bundled skill root (vendored from dsh's cordis preset; provenance in THIRD_PARTY_NOTICES). */
+const BUNDLED_SKILLS_DIR = fileURLToPath(new URL("../skills/", import.meta.url))
+
+/**
+ * Cordis-preset persona, adapted from dsh's shipped `agent.cordis.yml`: the
+ * two paragraphs about preset directories and the roster are dropped — this
+ * deployment has no preset-authoring tree, its composition is fixed in code —
+ * and the skill pointer targets the one bundled skill that applies here.
+ */
+const CORDIS_PERSONA =
+  "You are a coding agent running on the DeepSeek Harness.\n\n" +
+  "You can read and extend the harness you run on. Its composition is Cordis: every capability " +
+  "is a plugin, and this session carries the Cordis toolset — inspect the live runtime, define " +
+  "dynamic plugins, and activate them.\n\n" +
+  "Load the `cordis-plugin-development` skill before defining or changing a plugin."
 export type PermissionMode = "read-only" | "workspace-write" | "danger-full-access"
 
 export const HARNESS_PRESETS: readonly HarnessPreset[] = ["standard", "minimal", "anchored", "code", "cordis"]
@@ -117,7 +137,11 @@ export function pluginRows(options: ResolvedComposeOptions): PluginRow[] {
     // process-wide; configuring the prompt runtime directly is the host-plane way).
     core("system-prompt", "@deepseek-ai/dsh-system-prompt", "System prompt assembly (persona + tool sections)", async (ctx, config) =>
       ctx.plugin(SystemPrompt, config as never),
-      preset === "anchored" ? { persona: "You are a helpful software engineer assistant." } : undefined),
+      preset === "anchored"
+        ? { persona: "You are a helpful software engineer assistant." }
+        : preset === "cordis"
+          ? { persona: CORDIS_PERSONA }
+          : undefined),
     // Context-global presentation is the tools row's `mode` field (presentAs is
     // the per-agent-scope variant used by dsh's preset realms).
     core("tools", "@deepseek-ai/dsh-tools", "Tool runtime: schema registry, dispatch, presentation mode", async (ctx, config) =>
@@ -245,6 +269,15 @@ export function pluginRows(options: ResolvedComposeOptions): PluginRow[] {
           ctx.plugin(CordisHostRunner, config as never)),
         tool("tool-cordis", "@deepseek-ai/dsh-tool-cordis", "cordis_define / cordis_run / cordis_inspect tools", async (ctx, config) =>
           ctx.plugin(ToolCordis, config as never), undefined, ["cordis-host-runner"]),
+        // The composition-authoring skill travels with the preset (mirrors
+        // dsh's shipped cordis preset): registry + filesystem provider over
+        // the bundled skills/ dir + the skill tool the model calls.
+        tool("skill", "@deepseek-ai/dsh-skill", "Skill registry (session skill catalog)", async (ctx, config) =>
+          ctx.plugin(SkillRegistry, config as never)),
+        tool("skill-filesystem", "@deepseek-ai/dsh-skill-filesystem", "Filesystem skill provider (bundled skills/)", async (ctx, config) =>
+          ctx.plugin(SkillFilesystem, config as never), { customSkillDirs: [BUNDLED_SKILLS_DIR] }, ["skill"]),
+        tool("tool-skill", "@deepseek-ai/dsh-tool-skill", "skill tool (load bundled skill instructions)", async (ctx, config) =>
+          ctx.plugin(ToolSkill, config as never), undefined, ["skill"]),
       )
     }
   }

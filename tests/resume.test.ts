@@ -49,6 +49,31 @@ describe("session/resume", () => {
     await h2.dispose()
   })
 
+  test("interrupted turn then restart: cancel mid-turn, cold resume continues from the log", async () => {
+    const root = tempRoot()
+
+    // First life: prompt and cancel without waiting for settlement, then tear down.
+    const h1 = await makeHarness([textResponse("partial answer")], { sessionsRoot: root })
+    await h1.initialize()
+    const { sessionId } = await h1.agent.request("session/new", { cwd: "/tmp" })
+    const prompt = h1.agent.request("session/prompt", { sessionId, prompt: [{ type: "text", text: "interrupted question" }] })
+    await h1.agent.notify("session/cancel", { sessionId })
+    await prompt
+    await untilFrame(() => h1.states().at(-1)?.state === "idle")
+    expect(h1.states().at(-1)?.stopReason).toBe("cancelled")
+    await h1.dispose()
+
+    // Second life: the user message survived; the continuation request carries it.
+    const h2 = await makeHarness([textResponse("recovered")], { sessionsRoot: root })
+    await h2.initialize()
+    await h2.agent.request("session/resume", { sessionId, cwd: "/tmp" })
+    await h2.agent.request("session/prompt", { sessionId, prompt: [{ type: "text", text: "continue" }] })
+    await untilFrame(() => h2.states().at(-1)?.state === "idle")
+    const request = h2.adapter.requests.at(0)
+    expect(JSON.stringify(request)).toContain("interrupted question")
+    await h2.dispose()
+  })
+
   test("resume of an unknown session is invalid params", async () => {
     const h = await makeHarness([], { sessionsRoot: tempRoot() })
     await h.initialize()

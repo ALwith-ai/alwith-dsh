@@ -19,6 +19,12 @@ respective licenses.
 
 ---
 
+`skills/cordis-plugin-development/` is vendored verbatim from
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (MIT),
+path `apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/`.
+
+---
+
 `src/vendor/anchored-tool-bootstrap.mjs` is vendored from
 [dsh-web-ui](https://github.com/zhu1090093659/dsh-web-ui) (Apache-2.0), package
 `dsh-liangshen`, itself derived from

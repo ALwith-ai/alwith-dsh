@@ -17,6 +17,12 @@ Copyright (c) 2026 DeepSeek
 
 ---
 
+`skills/cordis-plugin-development/` 逐字 vendor 自
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)(MIT),
+路径 `apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/`。
+
+---
+
 `src/vendor/anchored-tool-bootstrap.mjs` vendor 自
 [dsh-web-ui](https://github.com/zhu1090093659/dsh-web-ui)(Apache-2.0)的
 `dsh-liangshen` 包,其上游为

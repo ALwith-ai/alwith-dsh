@@ -6,7 +6,7 @@
 
 由 [ALwith](https://github.com/ALwith-ai) 维护;**ALwith Desktop 是它的参考客户端**(dsh 的桌面端形态)。上游的 ACP 实现是刻意的 automation-only(仅新会话、只发已提交输出),本桥补齐交互式一侧。
 
-> 状态:developer preview。覆盖 `session/new` + prompt + 流式 + 状态直报 + cancel + `session/resume`(live-first 接续、JSONL 持久化冷恢复、客户端 `replayFrom` 游标历史回放)+ 沙箱优先工具面与升级审批 + 会话中切模型(`session/set_config_option`)+ 会话标题 + 全部 dsh 预设(`standard` / `minimal` / `anchored` / `code` PTC,跑在 Bun 补丁版官方 worker 运行时上 / `cordis` 创造模式,vm 域动态插件工具组)。
+> 状态:developer preview。覆盖 `session/new` + prompt + 流式 + 状态直报 + cancel + `session/resume`(live-first 接续、JSONL 持久化冷恢复、客户端 `replayFrom` 游标历史回放)+ 沙箱优先工具面与升级审批 + 会话中切模型(`session/set_config_option`)+ LLM 会话标题(先落确定性截断,后台一次生成升级)+ 全部 dsh 预设(`standard` / `minimal` / `anchored` / `code` PTC,跑在 Bun 补丁版官方 worker 运行时上 / `cordis` 创造模式,vm 域动态插件工具组 + 随捆 `cordis-plugin-development` skill)+ 面向宿主的 `plugins` / `sessions` 管理 CLI。
 
 ## 结构
 
@@ -17,6 +17,8 @@
 | `src/plugins.ts` | 插件清单:组合面即数据(逐预设 roster、核心行保护、用户覆盖) |
 | `src/compose.ts` | 按清单组合运行时(不用 dsh loader/profile——组合确定性,Bun 可跑) |
 | `src/plugins-cli.ts` | `plugins` 子命令:无活会话即可列出与开关插件 |
+| `src/sessions-cli.ts` | `sessions` 子命令:经 dsh 自家 persistence 检查会话日志 |
+| `skills/` | 随预设捆入的 skill(vendor 自 dsh cordis 预设,MIT) |
 | `src/main.ts` | stdio 入口,供宿主 spawn |
 
 ## 运行

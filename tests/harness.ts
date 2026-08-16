@@ -71,6 +71,8 @@ export async function untilFrame(condition: () => boolean, timeoutMs = 1000): Pr
 export interface HarnessOptions {
   /** JSONL session-log root; absent means no persistence (resume fails loud). */
   sessionsRoot?: string
+  /** Enables background LLM session titles (absent keeps the deterministic truncation). */
+  titleModel?: string
 }
 
 export async function makeHarness(script: ScriptEntry[], options: HarnessOptions = {}) {
@@ -95,7 +97,7 @@ export async function makeHarness(script: ScriptEntry[], options: HarnessOptions
     name: Bridge.name,
     inject: [...Bridge.inject],
     apply: (inner: Context) => {
-      Bridge.apply(inner, { provider: "mock", model: "mock", stream: agentStream })
+      Bridge.apply(inner, { provider: "mock", model: "mock", titleModel: options.titleModel, stream: agentStream })
     },
   })
 

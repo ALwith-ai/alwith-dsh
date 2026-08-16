@@ -61,8 +61,8 @@ import type { ContentBlock as DshContentBlock } from "@deepseek-ai/dsh-llm"
 import { acpPromptToText, promptHasUnsupportedContent, turnEndToStopReason } from "./codec.ts"
 
 export const name = "alwith-dsh-acp"
-/** The bridge creates and owns agents; every other concern is carried by the composition. */
-export const inject = ["agents"]
+/** The bridge creates and owns agents (llm serves background session titling); every other concern is carried by the composition. */
+export const inject = ["agents", "llm"]
 
 /** Wire protocol version; moves in lockstep with the ALwith Desktop client. */
 export const ACP_PROTOCOL_VERSION = 2
@@ -73,6 +73,12 @@ export interface AcpConfig {
   model?: string
   /** Host-facing provider identity stamped into `_meta.alwith` turn metadata; defaults to `provider`. */
   providerId?: string
+  /**
+   * Model for background LLM session titles (a short one-shot after the first
+   * turn settles). Absent means titles stay the deterministic first-prompt
+   * truncation — tests rely on that default.
+   */
+  titleModel?: string
   /** Test-only transport override; production uses stdio. */
   stream?: Stream
 }
@@ -81,6 +87,7 @@ export const Config: Schema<AcpConfig> = Schema.object({
   provider: Schema.string(),
   model: Schema.string(),
   providerId: Schema.string(),
+  titleModel: Schema.string(),
 })
 
 /** Per-session protocol state. */
@@ -193,6 +200,49 @@ export function apply(ctx: Context, config: AcpConfig): void {
       sessionId: record.agent.session.id,
       update: { sessionUpdate: "state_update", state: "idle", stopReason },
     })
+  }
+
+  /**
+   * Background LLM titling: after the first turn settles, one short generate
+   * upgrades the deterministic first-prompt title. Best-effort by design —
+   * the deterministic title is already on the wire, so a failed upgrade is
+   * logged and the session keeps working (this is the "expected-failure
+   * best-effort" category, not a swallowed error).
+   */
+  const refineTitle = async (record: SessionRecord, firstPrompt: string): Promise<void> => {
+    if (config.titleModel === undefined || config.provider === undefined) return
+    try {
+      const message = createUserMessage({ content: [{ type: "text", text: firstPrompt }], source: { kind: "user" } })
+      let title = ""
+      for await (const chunk of ctx.llm.stream({
+        provider: config.provider,
+        model: config.titleModel,
+        system:
+          "Name this conversation from the user's first message. " +
+          "Reply with the title only: at most six words, no quotes, no trailing punctuation.",
+        messages: [message],
+        maxTokens: 24,
+      })) {
+        if (chunk.type === "text-delta") title += chunk.text
+        if (chunk.type === "finish" && chunk.reason.kind !== "stop") {
+          throw new Error(`title generation finished with ${chunk.reason.kind}`)
+        }
+      }
+      title = title
+        .trim()
+        .replace(/\s+/g, " ")
+        .replace(/^["'“”‘’「『]+|["'“”‘’」』.。!?]+$/g, "")
+        .slice(0, 60)
+      if (title.length === 0) return
+      // The session may have closed while the title was generating.
+      if (sessions.get(record.agent.session.id) !== record) return
+      notify({
+        sessionId: record.agent.session.id,
+        update: { sessionUpdate: "session_info_update", title },
+      })
+    } catch (error: unknown) {
+      logger.warn(`acp: llm session title failed: ${String(error)}`)
+    }
   }
 
   /** Map a tool result's model-facing blocks to v2 tool-call content (text verbatim, images as placeholders). */
@@ -659,9 +709,10 @@ export function apply(ctx: Context, config: AcpConfig): void {
       if (ctx.agents.get(record.agent.id) !== record.agent) {
         throw internalError("prompt was not queued: the agent was disposed outside the bridge")
       }
-      if (!record.titled) {
-        // Deterministic session title from the first prompt (LLM titling is a
-        // later enhancement); the host also backfills run-state titles from this frame.
+      // Deterministic first-prompt title lands immediately (the host backfills
+      // run-state titles from this frame); the LLM upgrade runs after settlement.
+      const firstPrompt = !record.titled
+      if (firstPrompt) {
         record.titled = true
         const title = text.trim().replace(/\s+/g, " ").slice(0, 60)
         notify({
@@ -709,6 +760,8 @@ export function apply(ctx: Context, config: AcpConfig): void {
           inflight.resolve()
         })
       })
+      // First turn settled: upgrade the deterministic title in the background.
+      if (firstPrompt) void refineTitle(record, text)
       return {}
     })
     .onNotification("session/cancel", context => {

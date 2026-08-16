@@ -6,7 +6,7 @@ An **interactive ACP v2 bridge** for [DeepSeek Harness](https://github.com/deeps
 
 Maintained by [ALwith](https://github.com/ALwith-ai); **ALwith Desktop is its reference client** (the desktop form of dsh). Upstream's own ACP surface is deliberately automation-only (fresh sessions, committed output only); this bridge provides the interactive side.
 
-> Status: developer preview. Covers `session/new` + prompt + streaming + run-state reporting + cancel + `session/resume` (live-first reattach, cold resume from JSONL persistence, client-driven `replayFrom` history replay) + sandbox-first tools with escalation approvals + in-session model switching (`session/set_config_option`) + session titles + all dsh presets (`standard` / `minimal` / `anchored` / `code` PTC on the Bun-patched official worker runtime / `cordis` creator with the vm-realm dynamic-plugin toolset).
+> Status: developer preview. Covers `session/new` + prompt + streaming + run-state reporting + cancel + `session/resume` (live-first reattach, cold resume from JSONL persistence, client-driven `replayFrom` history replay) + sandbox-first tools with escalation approvals + in-session model switching (`session/set_config_option`) + LLM session titles (deterministic first, one background generate upgrades) + all dsh presets (`standard` / `minimal` / `anchored` / `code` PTC on the Bun-patched official worker runtime / `cordis` creator with the vm-realm dynamic-plugin toolset and the bundled `cordis-plugin-development` skill) + host-facing `plugins` / `sessions` management CLIs.
 
 ## Layout
 
@@ -17,6 +17,8 @@ Maintained by [ALwith](https://github.com/ALwith-ai); **ALwith Desktop is its re
 | `src/plugins.ts` | Plugin manifest: the composition as data (per-preset roster, core protection, overrides) |
 | `src/compose.ts` | Composes the runtime from the manifest (no dsh loader/profile — deterministic, runs on Bun) |
 | `src/plugins-cli.ts` | `plugins` subcommand: list and toggle plugins without a live session |
+| `src/sessions-cli.ts` | `sessions` subcommand: session-log inspection through dsh's own persistence |
+| `skills/` | Skills bundled into presets (vendored from dsh's cordis preset, MIT) |
 | `src/main.ts` | stdio entry for hosts to spawn |
 
 ## Run

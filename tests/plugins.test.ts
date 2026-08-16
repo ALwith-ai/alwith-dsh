@@ -60,6 +60,20 @@ describe("plugin manifest", () => {
   })
 })
 
+describe("cordis skill bundle", () => {
+  test("cordis composes the skill toolset and the bundled authoring skill is discoverable", async () => {
+    const ctx = await composeRuntime({ preset: "cordis" })
+    const names = (ctx.tools as unknown as { schemas: (c: unknown) => Array<{ name: string }> })
+      .schemas(ctx)
+      .map(schema => schema.name)
+    expect(names).toContain("skill")
+    expect(names).toContain("cordis_define")
+    const skills = await (ctx as unknown as { skills: { list: () => Promise<Array<{ name: string }>> } }).skills.list()
+    expect(skills.map(skill => skill.name)).toContain("cordis-plugin-development")
+    await ctx.fiber.dispose()
+  })
+})
+
 describe("plugins CLI", () => {
   function captureStdout(): { lines: string[]; restore: () => void } {
     const lines: string[] = []

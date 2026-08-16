@@ -11,12 +11,13 @@ import { loadPluginOverrides } from "./plugins.ts"
 import { defaultPluginsFile, runPluginsCli } from "./plugins-cli.ts"
 import * as Bridge from "./bridge.ts"
 
-// `plugins` subcommand: overrides-file management for hosts, no ACP server.
-// Validation failures exit 1 with the reason as a single stderr line — the
-// host surfaces stderr verbatim, so no runtime stack noise here.
-if (process.argv[2] === "plugins") {
+// `plugins` / `sessions` subcommands: host-facing management without an ACP
+// server. Failures exit 1 with the reason as a single stderr line — the host
+// surfaces stderr verbatim, so no runtime stack noise here.
+if (process.argv[2] === "plugins" || process.argv[2] === "sessions") {
   try {
-    await runPluginsCli(process.argv.slice(3))
+    if (process.argv[2] === "plugins") await runPluginsCli(process.argv.slice(3))
+    else await (await import("./sessions-cli.ts")).runSessionsCli(process.argv.slice(3))
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
     process.exit(1)
@@ -29,6 +30,8 @@ const model = process.env.ALWITH_DSH_MODEL ?? "deepseek-v4-flash"
 // Host-facing provider identity for _meta.alwith turn metadata (the ALwith
 // Desktop provider vocabulary, not the dsh adapter route).
 const providerId = process.env.ALWITH_DSH_PROVIDER_ID ?? "deepseek"
+// Background LLM session titles ride the session's model unless overridden.
+const titleModel = process.env.ALWITH_DSH_TITLE_MODEL ?? model
 // Session logs live under the sidecar's own home by default; the host
 // (ALwith Desktop) overrides this to its managed location.
 const sessionsRoot = process.env.ALWITH_DSH_SESSIONS_ROOT ?? join(homedir(), ".alwith-dsh", "sessions")
@@ -52,6 +55,6 @@ const overrides = loadPluginOverrides(defaultPluginsFile())
 
 const ctx = await composeRuntime({ sessionsRoot, workspaceRoot, permissionMode, preset: rawPreset as (typeof PRESETS)[number], overrides })
 await ctx.plugin(
-  { name: Bridge.name, inject: [...Bridge.inject], apply: (inner: typeof ctx) => Bridge.apply(inner, { provider, model, providerId }) },
+  { name: Bridge.name, inject: [...Bridge.inject], apply: (inner: typeof ctx) => Bridge.apply(inner, { provider, model, providerId, titleModel }) },
 )
 // stdin keeps the process alive; the bridge's quiesce handles connection close.
