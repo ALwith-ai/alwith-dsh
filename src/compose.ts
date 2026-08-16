@@ -41,6 +41,7 @@ import * as ToolFsSearch from "@deepseek-ai/dsh-tool-fs-search"
 import * as ToolWeb from "@deepseek-ai/dsh-tool-web"
 import * as WebSearchDeepseek from "@deepseek-ai/dsh-web-search-deepseek"
 import * as AnchoredToolBootstrap from "./vendor/anchored-tool-bootstrap.mjs"
+import CodeRuntimeWorker from "@deepseek-ai/dsh-code-runtime-worker-thread"
 import WebRuntime from "@deepseek-ai/dsh-web"
 import TerminalSessionService from "@deepseek-ai/dsh-terminal"
 import * as TerminalBash from "@deepseek-ai/dsh-terminal-bash"
@@ -52,7 +53,7 @@ import * as ToolStrReplaceEditor from "@deepseek-ai/dsh-tool-str-replace-editor"
  * built-in presets; `code` (Code Mode) and `cordis` (self-modification) are
  * not composed by this sidecar yet and are rejected at the entry.
  */
-export type HarnessPreset = "standard" | "minimal" | "anchored"
+export type HarnessPreset = "standard" | "minimal" | "anchored" | "code"
 
 export interface ComposeOptions {
   /**
@@ -82,7 +83,9 @@ export async function composeRuntime(options: ComposeOptions = {}): Promise<Cont
     SystemPrompt,
     preset === "anchored" ? { persona: "You are a helpful software engineer assistant." } : undefined,
   )
-  await ctx.plugin(ToolRuntime)
+  // Context-global presentation is the tools row's `mode` field (presentAs is
+  // the per-agent-scope variant used by dsh's preset realms).
+  await ctx.plugin(ToolRuntime, preset === "code" ? { mode: "code" } : undefined)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(LlmDeepseek)
@@ -148,6 +151,10 @@ export async function composeRuntime(options: ComposeOptions = {}): Promise<Cont
       deferredSources: [],
     })
   } else {
+    // standard and code share the coding-agent tool surface; code adds the
+    // Code Mode presentation (one run_code tool over the generated SDK) backed
+    // by the official worker runtime (Bun-patched: amaro strip + null stdio,
+    // see patches/).
     await ctx.plugin(ToolFs)
     await ctx.plugin(ToolFsSearch, { sampleOverCapGlobResults: false })
     await ctx.plugin(ToolBash)
@@ -157,6 +164,9 @@ export async function composeRuntime(options: ComposeOptions = {}): Promise<Cont
     await ctx.plugin(WebRuntime, { searchProvider: "deepseek-official" })
     await ctx.plugin(WebSearchDeepseek, { apiKeyEnv: "DEEPSEEK_API_KEY" })
     await ctx.plugin(ToolWeb, { fetch: false, searchTimeoutMs: 60000 })
+    if (preset === "code") {
+      await ctx.plugin(CodeRuntimeWorker)
+    }
   }
   return ctx
 }

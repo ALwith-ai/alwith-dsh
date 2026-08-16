@@ -1,0 +1,46 @@
+diff --git a/node_modules/@deepseek-ai/dsh-code-runtime-worker-thread/.bun-tag-14715fb09c287047 b/.bun-tag-14715fb09c287047
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/@deepseek-ai/dsh-code-runtime-worker-thread/.bun-tag-355e6dae443c14ad b/.bun-tag-355e6dae443c14ad
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/@deepseek-ai/dsh-code-runtime-worker-thread/.bun-tag-6d7c8381944553c b/.bun-tag-6d7c8381944553c
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/lib/index.js b/lib/index.js
+index 9db8301ab5e3123b61e387ec964963503407f863..d6d1891131b3f908dfdaa50c6858dac7dbbb3a65 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,4 +1,7 @@
+-import { stripTypeScriptTypes } from "node:module";
++// PATCHED for Bun (ALwith sidecar): Bun's node:module lacks stripTypeScriptTypes.
++// amaro is the exact library Node vendors for it - identical offset-preserving strip.
++import { transformSync as __amaroTransformSync } from "amaro";
++const stripTypeScriptTypes = (source) => __amaroTransformSync(source).code;
+ import { Worker } from "node:worker_threads";
+ import { fileURLToPath } from "node:url";
+ import z from "@deepseek-ai/schemastery";
+@@ -505,7 +508,8 @@ function messageOf(error) {
+ }
+ /** Resolve after a worker pipe emits all queued data, or closes/errors during termination. */
+ function waitForPipeDrain(stream) {
+-	if (stream.readableEnded || stream.destroyed) return Promise.resolve();
++	// PATCHED for Bun: piped worker stdio is null (see the stray-capture note).
++	if (!stream || stream.readableEnded || stream.destroyed) return Promise.resolve();
+ 	return new Promise((resolve) => {
+ 		const done = () => {
+ 			stream.off("end", done);
+@@ -771,8 +775,11 @@ var WorkerThreadCodeRuntime = class extends CodeRuntime {
+ 					finish(limited);
+ 				}
+ 			};
+-			worker.stdout.on("data", captureStray);
+-			worker.stderr.on("data", captureStray);
++			// PATCHED for Bun: piped worker stdio is not implemented (worker.stdout is
++			// null), so stray-write capture degrades gracefully; the primary log path
++			// (the worker-owned console over the message channel) is unaffected.
++			worker.stdout?.on("data", captureStray);
++			worker.stderr?.on("data", captureStray);
+ 			let finishResolve;
+ 			const finished = new Promise((done) => {
+ 				finishResolve = done;
