@@ -6,7 +6,7 @@
 
 由 [ALwith](https://github.com/ALwith-ai) 维护;**ALwith Desktop 是它的参考客户端**(dsh 的桌面端形态)。上游的 ACP 实现是刻意的 automation-only(仅新会话、只发已提交输出),本桥补齐交互式一侧。
 
-> 状态:developer preview。MVP 覆盖 `session/new` + prompt + 流式 + 状态直报 + cancel;`session/resume`(接上会话 + 历史回放)与 Agent 预设下发开发中。
+> 状态:developer preview。覆盖 `session/new` + prompt + 流式 + 状态直报 + cancel + `session/resume`(live-first 接续、JSONL 持久化冷恢复、客户端 `replayFrom` 游标历史回放)。工具与 Agent 预设下发开发中。
 
 ## 结构
 
@@ -24,7 +24,7 @@ DEEPSEEK_API_KEY=… bun src/main.ts   # stdio 上的 ACP v2 服务器
 bun test                              # mock 适配器协议测试,不打真模型
 ```
 
-MVP 范围:`session/new` + prompt + cancel。`session/resume`(接上会话 + 历史回放)与 Agent 预设下发在里程碑 2。
+`session/resume` 语义:`replayFrom` 省略 = 只恢复上下文;`{ type: "start" }` = 整段对话重放为 `session/update` 帧。会话日志在 `$ALWITH_DSH_SESSIONS_ROOT`(默认 `~/.alwith-dsh/sessions`)。
 
 ## License
 

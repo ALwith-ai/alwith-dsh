@@ -39,6 +39,8 @@ import {
   type NewSessionResponse,
   type PromptRequest,
   type PromptResponse,
+  type ResumeSessionRequest,
+  type ResumeSessionResponse,
   type MessageId,
   type UpdateSessionNotification,
   type StopReason,
@@ -46,8 +48,10 @@ import {
 } from "@agentclientprotocol/sdk/experimental/v2"
 import type { Agent } from "@deepseek-ai/dsh-agent"
 import { SessionId, type SessionEvent, type TurnEndReason } from "@deepseek-ai/dsh-session"
-// Side-effect type import: declaration-merges the approval/request waterfall types.
+// Side-effect type imports: declaration-merge the approval/request waterfall
+// types and the ctx.sessionPersistence key.
 import type {} from "@deepseek-ai/dsh-user-approval"
+import type {} from "@deepseek-ai/dsh-session-persistence"
 import { acpPromptToText, promptHasUnsupportedContent, turnEndToStopReason } from "./codec.ts"
 
 export const name = "alwith-dsh-acp"
@@ -110,6 +114,8 @@ export function apply(ctx: Context, config: AcpConfig): void {
   const agents = ctx.agents
   const logger = ctx.logger
   const sessions = new Map<SessionId, SessionRecord>()
+  /** In-flight resume acquisitions by id: a second prepare while the first is publishing would hit the live gate. */
+  const resumes = new Map<SessionId, Promise<SessionRecord>>()
   let closed = false
   let client: AgentContext
 
@@ -160,6 +166,102 @@ export function apply(ctx: Context, config: AcpConfig): void {
     if (inflight === undefined) return
     record.inflight = undefined
     inflight.resolve()
+  }
+
+  /** Live-first session acquisition for resume: reuse a bridge-owned live agent, else cold-resume from persistence. */
+  const acquireSession = async (sessionId: SessionId, cwd: string): Promise<SessionRecord> => {
+    const live = sessions.get(sessionId)
+    if (live !== undefined) {
+      const storedCwd = live.agent.session.header.cwd
+      if (storedCwd !== undefined && storedCwd !== cwd) {
+        throw invalidParams(`cwd mismatch: session was created in ${storedCwd}`)
+      }
+      return live
+    }
+    if (ctx.agents.get(sessionId) !== undefined) {
+      // In the sidecar composition every agent is bridge-owned; an unowned live
+      // agent means another frontend shares this context — refuse rather than
+      // adopt an agent this bridge cannot dispose.
+      throw internalError(`session ${sessionId} is live outside the bridge`)
+    }
+    const persistence = ctx.get("sessionPersistence")
+    if (persistence === undefined) {
+      throw internalError("session persistence is not configured; session/resume is unavailable")
+    }
+    let inspection: Awaited<ReturnType<typeof persistence.inspect>>
+    try {
+      inspection = await persistence.inspect(sessionId)
+    } catch (error: unknown) {
+      throw invalidParams(`unknown session: ${sessionId} (${errorChain(error)})`)
+    }
+    if (inspection.meta.cwd !== undefined && inspection.meta.cwd !== cwd) {
+      throw invalidParams(`cwd mismatch: session was created in ${inspection.meta.cwd}`)
+    }
+    const handle = await agents.resume({ resumeSessionId: sessionId, agentOptions: agentOptions(config) })
+    if (closed) {
+      await handle.dispose()
+      throw internalError("connection closed during session/resume")
+    }
+    const record: SessionRecord = {
+      agent: handle.agent,
+      dispose: () => handle.dispose(),
+      inflight: undefined,
+      pendingPermissions: 0,
+      lastState: undefined,
+    }
+    sessions.set(sessionId, record)
+    return record
+  }
+
+  /**
+   * Replay the whole conversation as session/update frames (the replayFrom
+   * { type: "start" } cursor). Committed messages only: user text as
+   * user_message_chunk, assistant text/reasoning as message/thought chunks,
+   * images as placeholders — mirroring the live-stream vocabulary.
+   */
+  const replayHistory = (record: SessionRecord): void => {
+    const sessionId = record.agent.session.id
+    for (const event of record.agent.session.events) {
+      if (event.type === "user/message") {
+        const message = event.data
+        for (const block of message.content) {
+          if (block.type === "text" && block.text.length > 0) {
+            notify({
+              sessionId,
+              update: { sessionUpdate: "user_message_chunk", messageId: MessageId(message.id), content: { type: "text", text: block.text } },
+            })
+          }
+        }
+      } else if (event.type === "assistant/message") {
+        const message = event.data.message
+        for (const block of message.content) {
+          if (block.type === "text" && block.text.length > 0) {
+            notify({
+              sessionId,
+              update: { sessionUpdate: "agent_message_chunk", messageId: MessageId(message.id), content: { type: "text", text: block.text } },
+            })
+          } else if (block.type === "reasoning" && block.text.length > 0) {
+            notify({
+              sessionId,
+              update: {
+                sessionUpdate: "agent_thought_chunk",
+                messageId: MessageId(`${message.id}/thought`),
+                content: { type: "text", text: block.text },
+              },
+            })
+          } else if (block.type === "image") {
+            notify({
+              sessionId,
+              update: {
+                sessionUpdate: "agent_message_chunk",
+                messageId: MessageId(message.id),
+                content: { type: "text", text: `[image attachment ${block.attachment.attachmentId}]` },
+              },
+            })
+          }
+        }
+      }
+    }
   }
 
   // Token-level streaming: text-delta → agent_message_chunk, reasoning-delta →
@@ -299,6 +401,29 @@ export function apply(ctx: Context, config: AcpConfig): void {
         lastState: undefined,
       })
       return { sessionId }
+    })
+    .onRequest("session/resume", async (context): Promise<ResumeSessionResponse> => {
+      assertOpen()
+      const params: ResumeSessionRequest = context.params
+      if (!isAbsolute(params.cwd)) throw invalidParams(`cwd must be an absolute path: ${params.cwd}`)
+      const sessionId = SessionId(params.sessionId)
+      let pending = resumes.get(sessionId)
+      if (pending === undefined) {
+        pending = acquireSession(sessionId, params.cwd)
+        resumes.set(sessionId, pending)
+        void pending.catch(() => {}).finally(() => resumes.delete(sessionId))
+      }
+      const record = await pending
+      // Replay is client-driven: an omitted/null cursor means context-only
+      // restore (the client already has the history); { type: "start" } means
+      // replay the whole conversation.
+      if (params.replayFrom !== undefined && params.replayFrom !== null) {
+        if (params.replayFrom.type !== "start") {
+          throw invalidParams(`unsupported replayFrom cursor: ${params.replayFrom.type}`)
+        }
+        replayHistory(record)
+      }
+      return {}
     })
     .onRequest("session/prompt", async (context): Promise<PromptResponse> => {
       assertOpen()

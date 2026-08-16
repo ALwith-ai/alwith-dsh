@@ -6,7 +6,7 @@ An **interactive ACP v2 bridge** for [DeepSeek Harness](https://github.com/deeps
 
 Maintained by [ALwith](https://github.com/ALwith-ai); **ALwith Desktop is its reference client** (the desktop form of dsh). Upstream's own ACP surface is deliberately automation-only (fresh sessions, committed output only); this bridge provides the interactive side.
 
-> Status: developer preview. The MVP covers `session/new` + prompt + streaming + run-state reporting + cancel; `session/resume` (reattach with history replay) and agent-preset delivery are in development.
+> Status: developer preview. Covers `session/new` + prompt + streaming + run-state reporting + cancel + `session/resume` (live-first reattach, cold resume from JSONL persistence, client-driven `replayFrom` history replay). Tools and agent-preset delivery are in development.
 
 ## Layout
 
@@ -24,7 +24,7 @@ DEEPSEEK_API_KEY=… bun src/main.ts   # ACP v2 server over stdio
 bun test                              # protocol tests with a mock adapter; no real model calls
 ```
 
-MVP scope: `session/new` + prompt + cancel. `session/resume` (reattach with history replay) and agent-preset delivery land in milestone 2.
+`session/resume` semantics: an omitted `replayFrom` means context-only restore; `{ type: "start" }` replays the whole conversation as `session/update` frames. Session logs live under `$ALWITH_DSH_SESSIONS_ROOT` (default `~/.alwith-dsh/sessions`).
 
 ## License
 

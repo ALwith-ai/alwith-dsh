@@ -7,8 +7,8 @@
  * internals that Bun (the bundled runtime this sidecar targets) does not
  * provide — hand composition sidesteps it entirely.
  *
- * MVP composition: chat only (no tools, no persistence). Tools and
- * session-persistence join in milestone 2 (session/load).
+ * Composition: chat + JSONL session persistence (required for session/resume).
+ * Tools join in a later milestone.
  */
 
 import { Context } from "@deepseek-ai/cordis"
@@ -18,11 +18,20 @@ import SystemPrompt from "@deepseek-ai/dsh-system-prompt"
 import ToolRuntime from "@deepseek-ai/dsh-tools"
 import AgentRegistry from "@deepseek-ai/dsh-agent"
 import AgentLoop from "@deepseek-ai/dsh-agent-loop"
+import JsonlSessionPersistence from "@deepseek-ai/dsh-session-persistence-jsonl"
 // Namespace import rather than default: a default export drops `inject`
 // (see dsh postmortem 0001).
 import * as LlmDeepseek from "@deepseek-ai/dsh-llm-deepseek"
 
-export async function composeRuntime(): Promise<Context> {
+export interface ComposeOptions {
+  /**
+   * Root directory for JSONL session logs. Absent means no persistence —
+   * session/resume then fails loud (`session persistence is not configured`).
+   */
+  sessionsRoot?: string
+}
+
+export async function composeRuntime(options: ComposeOptions = {}): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
@@ -31,5 +40,8 @@ export async function composeRuntime(): Promise<Context> {
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(LlmDeepseek)
+  if (options.sessionsRoot !== undefined) {
+    await ctx.plugin(JsonlSessionPersistence, { root: options.sessionsRoot })
+  }
   return ctx
 }
