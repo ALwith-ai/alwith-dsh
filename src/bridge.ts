@@ -224,7 +224,7 @@ export function apply(ctx: Context, config: AcpConfig): void {
         model: config.titleModel,
         ...(lowEffort !== undefined ? { reasoningEffort: lowEffort } : {}),
         system:
-          "Name this conversation from the user's first message. " +
+          "Name this conversation from the user's first message, in the same language as that message. " +
           "Reply with the title only: at most six words, no quotes, no trailing punctuation.",
         messages: [message],
         maxTokens: 128,
