@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "ACP v2 bridge plugin for DeepSeek Harness \u2014 makes dsh an ALwith chat backend",
+  "description": "ACP v2 bridge plugin for DeepSeek Harness — makes dsh an ALwith chat backend",
   "scripts": {
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit"
@@ -26,6 +26,7 @@
     "@deepseek-ai/dsh-jobs-local": "0.1.0-rc.8",
     "@deepseek-ai/dsh-llm": "0.1.0-rc.8",
     "@deepseek-ai/dsh-llm-deepseek": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-llm-pi-ai": "0.1.0-rc.8",
     "@deepseek-ai/dsh-permission-presets": "0.1.0-rc.8",
     "@deepseek-ai/dsh-sandbox": "0.1.0-rc.8",
     "@deepseek-ai/dsh-sandbox-local": "0.1.0-rc.8",
@@ -66,7 +67,9 @@
   },
   "trustedDependencies": [
     "@deepseek-ai/dsh-subprocess-local",
-    "koffi"
+    "@google/genai",
+    "koffi",
+    "node-pty"
   ],
   "patchedDependencies": {
     "@deepseek-ai/dsh-code-runtime-worker-thread@0.1.0-rc.8": "patches/@deepseek-ai%2Fdsh-code-runtime-worker-thread@0.1.0-rc.8.patch"

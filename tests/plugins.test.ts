@@ -60,6 +60,31 @@ describe("plugin manifest", () => {
   })
 })
 
+describe("multi-provider seat (pi-ai)", () => {
+  test("piProviders mounts the pi-ai adapter and registers its routes beside deepseek", async () => {
+    const ctx = await composeRuntime({
+      preset: "standard",
+      piProviders: { openai: { apiKeyEnv: "OPENAI_API_KEY" }, anthropic: { apiKeyEnv: "ANTHROPIC_API_KEY" } },
+    })
+    const providers = (ctx as unknown as { llm: { listProviders: () => Array<{ id: string }> } }).llm
+      .listProviders()
+      .map(provider => provider.id)
+    expect(providers).toContain("openai")
+    expect(providers).toContain("anthropic")
+    expect(providers).toContain("deepseek-official")
+    await ctx.fiber.dispose()
+  })
+
+  test("absent piProviders keeps the adapter unmounted (DeepSeek-only deployment)", async () => {
+    const ctx = await composeRuntime({ preset: "standard" })
+    const providers = (ctx as unknown as { llm: { listProviders: () => Array<{ id: string }> } }).llm
+      .listProviders()
+      .map(provider => provider.id)
+    expect(providers).not.toContain("openai")
+    await ctx.fiber.dispose()
+  })
+})
+
 describe("cordis skill bundle", () => {
   test("cordis composes the skill toolset and the bundled authoring skill is discoverable", async () => {
     const ctx = await composeRuntime({ preset: "cordis" })

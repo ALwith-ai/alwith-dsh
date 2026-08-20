@@ -58,7 +58,26 @@ async function startServer(): Promise<void> {
   // Per-plugin enable/disable + config; invalid content fails the spawn loud.
   const overrides = loadPluginOverrides(defaultPluginsFile())
 
-  const ctx = await composeRuntime({ sessionsRoot, workspaceRoot, permissionMode, preset: rawPreset as (typeof PRESETS)[number], overrides })
+  // Extra pi-ai provider routes (JSON dict, full upstream config shape:
+  // apiKeyEnv / baseURL / api / models / compat / …). Absent = DeepSeek-only.
+  let piProviders: Record<string, unknown> | undefined
+  const rawPiProviders = process.env.ALWITH_DSH_PI_PROVIDERS
+  if (rawPiProviders !== undefined) {
+    const parsed: unknown = JSON.parse(rawPiProviders)
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new Error("ALWITH_DSH_PI_PROVIDERS must be a JSON object keyed by provider route")
+    }
+    piProviders = parsed as Record<string, unknown>
+  }
+
+  const ctx = await composeRuntime({
+    sessionsRoot,
+    workspaceRoot,
+    permissionMode,
+    preset: rawPreset as (typeof PRESETS)[number],
+    overrides,
+    piProviders,
+  })
   await ctx.plugin(
     { name: Bridge.name, inject: [...Bridge.inject], apply: (inner: typeof ctx) => Bridge.apply(inner, { provider, model, providerId, titleModel }) },
   )

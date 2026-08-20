@@ -36,6 +36,8 @@ export interface ComposeOptions {
   preset?: HarnessPreset
   /** Per-plugin enable/disable + config, from the plugins.json overrides file. */
   overrides?: PluginOverrides
+  /** Extra pi-ai provider routes (see ResolvedComposeOptions.piProviders). */
+  piProviders?: Record<string, unknown>
 }
 
 export async function composeRuntime(options: ComposeOptions = {}): Promise<Context> {
@@ -44,6 +46,7 @@ export async function composeRuntime(options: ComposeOptions = {}): Promise<Cont
     workspaceRoot: options.workspaceRoot ?? process.cwd(),
     permissionMode: options.permissionMode ?? "workspace-write",
     preset: options.preset ?? "standard",
+    piProviders: options.piProviders,
   })
   const { mounted } = resolvePlugins(rows, options.overrides ?? {})
   const ctx = new Context()

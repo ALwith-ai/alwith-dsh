@@ -38,6 +38,7 @@ import ApprovalService from "@deepseek-ai/dsh-user-approval"
 // `inject` (see dsh postmortem 0001). Service classes above carry inject as a
 // static and are safe as defaults.
 import * as LlmDeepseek from "@deepseek-ai/dsh-llm-deepseek"
+import * as LlmPiAi from "@deepseek-ai/dsh-llm-pi-ai"
 import * as ShellEnv from "@deepseek-ai/dsh-shell-env"
 import * as FsObservationPolicy from "@deepseek-ai/dsh-fs-observation-policy"
 import * as ToolFs from "@deepseek-ai/dsh-tool-fs"
@@ -86,6 +87,13 @@ export interface ResolvedComposeOptions {
   workspaceRoot: string
   permissionMode: PermissionMode
   preset: HarnessPreset
+  /**
+   * Extra pi-ai provider routes (full upstream config shape passed through:
+   * apiKeyEnv / baseURL / api / models / compat / …). Absent or empty means
+   * the multi-provider adapter is not mounted — DeepSeek rides its own
+   * direct-fetch adapter either way.
+   */
+  piProviders?: Record<string, unknown>
 }
 
 export interface PluginRow {
@@ -154,6 +162,12 @@ export function pluginRows(options: ResolvedComposeOptions): PluginRow[] {
     core("llm-deepseek", "@deepseek-ai/dsh-llm-deepseek", "DeepSeek model adapter ($DEEPSEEK_API_KEY)", async (ctx, config) =>
       ctx.plugin(LlmDeepseek, config as never)),
   ]
+  if (options.piProviders !== undefined && Object.keys(options.piProviders).length > 0) {
+    rows.push(
+      core("llm-pi-ai", "@deepseek-ai/dsh-llm-pi-ai", "Multi-provider adapter (pi-ai catalog: openai / anthropic / google / …)",
+        async (ctx, config) => ctx.plugin(LlmPiAi, config as never), { providers: options.piProviders }),
+    )
+  }
   if (options.sessionsRoot !== undefined) {
     rows.push(
       core("session-persistence-jsonl", "@deepseek-ai/dsh-session-persistence-jsonl", "JSONL session logs (session/resume source)",
