@@ -1,12 +1,3 @@
-diff --git a/node_modules/@deepseek-ai/dsh-code-runtime-worker-thread/.bun-tag-14715fb09c287047 b/.bun-tag-14715fb09c287047
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/@deepseek-ai/dsh-code-runtime-worker-thread/.bun-tag-355e6dae443c14ad b/.bun-tag-355e6dae443c14ad
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/@deepseek-ai/dsh-code-runtime-worker-thread/.bun-tag-6d7c8381944553c b/.bun-tag-6d7c8381944553c
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/lib/index.js b/lib/index.js
 index 9db8301ab5e3123b61e387ec964963503407f863..d6d1891131b3f908dfdaa50c6858dac7dbbb3a65 100644
 --- a/lib/index.js
