@@ -70,6 +70,7 @@
     "koffi",
   ],
   "patchedDependencies": {
+    "@deepseek-ai/dsh-llm-pi-ai@0.1.0-rc.8": "patches/@deepseek-ai%2Fdsh-llm-pi-ai@0.1.0-rc.8.patch",
     "@deepseek-ai/dsh-code-runtime-worker-thread@0.1.0-rc.8": "patches/@deepseek-ai%2Fdsh-code-runtime-worker-thread@0.1.0-rc.8.patch",
   },
   "packages": {

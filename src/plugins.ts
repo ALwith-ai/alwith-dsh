@@ -39,6 +39,7 @@ import ApprovalService from "@deepseek-ai/dsh-user-approval"
 // static and are safe as defaults.
 import * as LlmDeepseek from "@deepseek-ai/dsh-llm-deepseek"
 import * as LlmPiAi from "@deepseek-ai/dsh-llm-pi-ai"
+import { defaultCredentialsFile, FileCredentialStore } from "./oauth.ts"
 import * as ShellEnv from "@deepseek-ai/dsh-shell-env"
 import * as FsObservationPolicy from "@deepseek-ai/dsh-fs-observation-policy"
 import * as ToolFs from "@deepseek-ai/dsh-tool-fs"
@@ -165,7 +166,16 @@ export function pluginRows(options: ResolvedComposeOptions): PluginRow[] {
   if (options.piProviders !== undefined && Object.keys(options.piProviders).length > 0) {
     rows.push(
       core("llm-pi-ai", "@deepseek-ai/dsh-llm-pi-ai", "Multi-provider adapter (pi-ai catalog: openai / anthropic / google / …)",
-        async (ctx, config) => ctx.plugin(LlmPiAi, config as never), { providers: options.piProviders }),
+        async (ctx, config) => {
+          // Subscription OAuth: the patched adapter (patches/) threads an
+          // app-owned credential store into pi-ai's Models — a route declaring
+          // no apiKeyEnv then authenticates through stored (auto-refreshed)
+          // OAuth credentials. The setter is our patch's export, hence the cast.
+          ;(LlmPiAi as unknown as { setCredentialStore: (store: FileCredentialStore) => void }).setCredentialStore(
+            new FileCredentialStore(defaultCredentialsFile()),
+          )
+          return ctx.plugin(LlmPiAi, config as never)
+        }, { providers: options.piProviders }),
     )
   }
   if (options.sessionsRoot !== undefined) {

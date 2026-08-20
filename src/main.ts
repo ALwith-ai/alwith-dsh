@@ -17,9 +17,10 @@ import * as Bridge from "./bridge.ts"
 // on the success path: Bun's exit does not flush pipes and a session dump
 // exceeds the 64KB pipe buffer — the drained event loop ends the process.
 const subcommand = process.argv[2]
-if (subcommand === "plugins" || subcommand === "sessions") {
+if (subcommand === "plugins" || subcommand === "sessions" || subcommand === "oauth") {
   try {
     if (subcommand === "plugins") await runPluginsCli(process.argv.slice(3))
+    else if (subcommand === "oauth") await (await import("./oauth.ts")).runOauthCli(process.argv.slice(3))
     else await (await import("./sessions-cli.ts")).runSessionsCli(process.argv.slice(3))
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
