@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { composeRuntime } from "../src/compose.ts"
-import { FileCredentialStore, runOauthCli } from "../src/oauth.ts"
+import { FileCredentialStore, hostLoginInteraction, runOauthCli } from "../src/oauth.ts"
 
 function tempFile(): string {
   return join(mkdtempSync(join(tmpdir(), "alwith-dsh-oauth-")), "credentials.json")
@@ -73,6 +73,32 @@ describe("oauth CLI", () => {
 
   test("login for an unwired provider fails loud", async () => {
     await expect(runOauthCli(["login", "acme"])).rejects.toThrow("no subscription login wired")
+  })
+})
+
+describe("host login interaction", () => {
+  test("a signalled prompt (callback-server race) stays pending, rejects on abort", async () => {
+    const controller = new AbortController()
+    const pending = hostLoginInteraction().prompt({
+      type: "manual_code",
+      message: "Complete login in your browser, or paste the authorization code here:",
+      signal: controller.signal
+    })
+    let settled = false
+    const observed = pending.catch(error => {
+      settled = true
+      return error as Error
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    controller.abort()
+    expect(((await observed) as Error).message).toContain("settled out of band")
+  })
+
+  test("a signal-less prompt is required input — fails loud", async () => {
+    await expect(
+      hostLoginInteraction().prompt({ type: "select", message: "pick one", options: [{ id: "a", label: "A" }] })
+    ).rejects.toThrow("interactive prompt not supported")
   })
 })
 

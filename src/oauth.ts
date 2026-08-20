@@ -17,7 +17,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
-import type { Credential, CredentialInfo, CredentialStore, OAuthAuth } from "@earendil-works/pi-ai"
+import type { AuthInteraction, Credential, CredentialInfo, CredentialStore, OAuthAuth } from "@earendil-works/pi-ai"
 
 export function defaultCredentialsFile(): string {
   return process.env.ALWITH_DSH_OAUTH_CREDENTIALS ?? join(homedir(), ".alwith-dsh", "credentials.json")
@@ -111,6 +111,34 @@ async function flowOf(providerId: string): Promise<OAuthAuth> {
   return load()
 }
 
+/**
+ * Interaction callbacks for a host-driven login. Events pass through verbatim
+ * as JSON lines (auth_url / info / progress / device_code) — the host opens
+ * auth_url. A prompt carrying `signal` is an alternative input path raced
+ * against the flow's callback server (e.g. anthropic's paste-the-redirect-URL
+ * `manual_code`); answering is optional, so it stays pending until pi-ai
+ * aborts it after login settles (the rejection lands in the flow's own
+ * `.catch`). A signal-less prompt is required input this non-interactive host
+ * cannot supply — fail loud rather than hang.
+ */
+export function hostLoginInteraction(): AuthInteraction {
+  return {
+    notify: event => emit({ ...event }),
+    prompt: prompt =>
+      new Promise<string>((_resolve, reject) => {
+        if (!prompt.signal) {
+          reject(new Error(`interactive prompt not supported in host login flow: ${JSON.stringify(prompt)}`))
+          return
+        }
+        prompt.signal.addEventListener(
+          "abort",
+          () => reject(new Error(`prompt "${prompt.type}" cancelled: login settled out of band`)),
+          { once: true }
+        )
+      })
+  }
+}
+
 /** `oauth login <provider>` / `oauth status` / `oauth logout <provider>`; stdout is JSON lines. */
 export async function runOauthCli(argv: string[]): Promise<void> {
   const [command, providerId] = argv
@@ -129,16 +157,7 @@ export async function runOauthCli(argv: string[]): Promise<void> {
   if (command === "login") {
     if (!providerId) throw new Error("usage: oauth login <provider>")
     const flow = await flowOf(providerId)
-    const credential = await flow.login({
-      // pi-ai's flows notify URLs/progress and may prompt (e.g. paste-code
-      // fallback). Events pass through verbatim (auth_url / info / progress /
-      // device_code) — the host opens auth_url; prompts are unsupported in
-      // this non-interactive host flow — fail loud rather than hang on stdin.
-      notify: event => emit({ ...event }),
-      prompt: prompt => {
-        throw new Error(`interactive prompt not supported in host login flow: ${JSON.stringify(prompt)}`)
-      }
-    })
+    const credential = await flow.login(hostLoginInteraction())
     await store.modify(providerId, async () => credential)
     emit({ type: "logged-in", providerId })
     return
