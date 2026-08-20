@@ -213,18 +213,24 @@ export function apply(ctx: Context, config: AcpConfig): void {
     if (config.titleModel === undefined || config.provider === undefined) return
     try {
       const message = createUserMessage({ content: [{ type: "text", text: firstPrompt }], source: { kind: "user" } })
+      // Reasoning models burn budget on reasoning before any text, so the cap
+      // is generous and the effort drops to the model's own "low" when it
+      // advertises one (efforts are adapter-owned; an invented id is rejected).
+      const modelInfo = await ctx.llm.resolveModelInfo(config.provider, config.titleModel).catch(() => undefined)
+      const lowEffort = modelInfo?.reasoning?.efforts.find(effort => String(effort.id) === "low")?.id
       let title = ""
       for await (const chunk of ctx.llm.stream({
         provider: config.provider,
         model: config.titleModel,
+        ...(lowEffort !== undefined ? { reasoningEffort: lowEffort } : {}),
         system:
           "Name this conversation from the user's first message. " +
           "Reply with the title only: at most six words, no quotes, no trailing punctuation.",
         messages: [message],
-        maxTokens: 24,
+        maxTokens: 128,
       })) {
         if (chunk.type === "text-delta") title += chunk.text
-        if (chunk.type === "finish" && chunk.reason.kind !== "stop") {
+        if (chunk.type === "finish" && chunk.reason.kind !== "stop" && chunk.reason.kind !== "max-tokens") {
           throw new Error(`title generation finished with ${chunk.reason.kind}`)
         }
       }
